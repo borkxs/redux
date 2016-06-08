@@ -1,4 +1,5 @@
 import expect from 'expect'
+import Immutable from 'immutable'
 import { combineReducers } from '../src'
 import createStore, { ActionTypes } from '../src/createStore'
 
@@ -16,6 +17,27 @@ describe('Utils', () => {
       expect(s1).toEqual({ counter: 1, stack: [] })
       const s2 = reducer(s1, { type: 'push', value: 'a' })
       expect(s2).toEqual({ counter: 1, stack: [ 'a' ] })
+    })
+
+    it('accepts options that configure how the combined reducer state is managed', () => {
+      const reducer = combineReducers({
+        counter: (state = 0, action) =>
+        action.type === 'increment' ? state + 1 : state,
+        stack: (state = [], action) =>
+        action.type === 'push' ? [ ...state, action.value ] : state
+      }, {
+        create: (obj) =>
+          (obj instanceof Immutable.Map) ? obj : new Immutable.Map(obj),
+        get: (state, key) => state.get(key),
+        set: (state, key, value) => state.set(key, value)
+      })
+
+      const s1 = reducer(undefined, { type: 'increment' })
+      expect(s1.get('counter')).toEqual(1)
+      expect(s1.get('stack')).toEqual([])
+      const s2 = reducer(s1, { type: 'push', value: 'a' })
+      expect(s2.get("counter")).toEqual(1)
+      expect(s2.get("stack")).toEqual([ 'a' ])
     })
 
     it('ignores all props which are not a function', () => {

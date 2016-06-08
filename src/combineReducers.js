@@ -87,10 +87,26 @@ function assertReducerSanity(reducers) {
  * if the state passed to them was undefined, and the current state for any
  * unrecognized action.
  *
+ * @param {Object} [options={
+ *  create: (obj) => obj,
+ *  get: (state, key) => state[key],
+ *  set: (state, key, value) => {
+ *    state[key] = value
+ *    return state
+ *  }
+ * }] An optional object for configuring how the top-level state is managed.
+ *
  * @returns {Function} A reducer function that invokes every reducer inside the
  * passed object, and builds a state object with the same shape.
  */
-export default function combineReducers(reducers) {
+export default function combineReducers(reducers, options = {
+  create: (obj) => obj,
+  get: (state, key) => state[key],
+  set: (state, key, stateForKey) => {
+    state[key] = stateForKey
+    return state
+  },
+}) {
   var reducerKeys = Object.keys(reducers)
   var finalReducers = {}
   for (var i = 0; i < reducerKeys.length; i++) {
@@ -99,6 +115,7 @@ export default function combineReducers(reducers) {
       finalReducers[key] = reducers[key]
     }
   }
+
   var finalReducerKeys = Object.keys(finalReducers)
 
   var sanityError
@@ -108,7 +125,7 @@ export default function combineReducers(reducers) {
     sanityError = e
   }
 
-  return function combination(state = {}, action) {
+  return function combination(state = options.create({}), action) {
     if (sanityError) {
       throw sanityError
     }
@@ -121,17 +138,17 @@ export default function combineReducers(reducers) {
     }
 
     var hasChanged = false
-    var nextState = {}
+    var nextState = options.create({})
     for (var i = 0; i < finalReducerKeys.length; i++) {
       var key = finalReducerKeys[i]
       var reducer = finalReducers[key]
-      var previousStateForKey = state[key]
+      var previousStateForKey = options.get(state, key)
       var nextStateForKey = reducer(previousStateForKey, action)
       if (typeof nextStateForKey === 'undefined') {
         var errorMessage = getUndefinedStateErrorMessage(key, action)
         throw new Error(errorMessage)
       }
-      nextState[key] = nextStateForKey
+      nextState = options.set(nextState, key, nextStateForKey)
       hasChanged = hasChanged || nextStateForKey !== previousStateForKey
     }
     return hasChanged ? nextState : state
