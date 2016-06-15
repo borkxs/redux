@@ -12,6 +12,16 @@ function getUndefinedStateErrorMessage(key, action) {
   )
 }
 
+function getInputStateTypeString(inputState) {
+  var inputMatch = inputState.toString().match(/(.*?)\s/)
+  var typeName = typeof inputState
+  return typeName === 'object'
+    ? isPlainObject(inputState)
+      ? ({}).toString.call(inputState).match(/\s([a-z|A-Z]+)/)[1]
+      : inputMatch && inputMatch[0]
+    : typeName
+}
+
 function getUnexpectedStateShapeWarningMessage(inputState, reducers, action) {
   var reducerKeys = Object.keys(reducers)
   var argumentName = action && action.type === ActionTypes.INIT ?
@@ -25,14 +35,14 @@ function getUnexpectedStateShapeWarningMessage(inputState, reducers, action) {
     )
   }
 
-  if (!isPlainObject(inputState)) {
-    return (
-      `The ${argumentName} has unexpected type of "` +
-      ({}).toString.call(inputState).match(/\s([a-z|A-Z]+)/)[1] +
-      `". Expected argument to be an object with the following ` +
-      `keys: "${reducerKeys.join('", "')}"`
-    )
-  }
+  // if (!isPlainObject(inputState)) {
+  //   return (
+  //     `The ${argumentName} has unexpected type of "` +
+  //     ({}).toString.call(inputState).match(/\s([a-z|A-Z]+)/)[1] +
+  //     `". Expected argument to be an object with the following ` +
+  //     `keys: "${reducerKeys.join('", "')}"`
+  //   )
+  // }
 
   var unexpectedKeys = Object.keys(inputState).filter(key => !reducers.hasOwnProperty(key))
 
@@ -105,7 +115,7 @@ export default function combineReducers(reducers, options = {
   set: (state, key, stateForKey) => {
     state[key] = stateForKey
     return state
-  },
+  }
 }) {
   var reducerKeys = Object.keys(reducers)
   var finalReducers = {}
@@ -125,12 +135,18 @@ export default function combineReducers(reducers, options = {
     sanityError = e
   }
 
+  var initialTypeString = getInputStateTypeString(options.create({}))
+
   return function combination(state = options.create({}), action) {
     if (sanityError) {
       throw sanityError
     }
 
     if (process.env.NODE_ENV !== 'production') {
+      var currentStateTypeString = getInputStateTypeString(state)
+      if (initialTypeString !== currentStateTypeString) {
+        throw new Error(`The state has type ${currentStateTypeString} but was expecting ${initialTypeString}`)
+      }
       var warningMessage = getUnexpectedStateShapeWarningMessage(state, finalReducers, action)
       if (warningMessage) {
         warning(warningMessage)

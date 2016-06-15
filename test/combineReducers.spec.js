@@ -35,9 +35,15 @@ describe('Utils', () => {
       const s1 = reducer(undefined, { type: 'increment' })
       expect(s1.get('counter')).toEqual(1)
       expect(s1.get('stack')).toEqual([])
+
       const s2 = reducer(s1, { type: 'push', value: 'a' })
-      expect(s2.get("counter")).toEqual(1)
-      expect(s2.get("stack")).toEqual([ 'a' ])
+      expect(s2.get('counter')).toEqual(1)
+      expect(s2.get('stack')).toEqual([ 'a' ])
+
+      // when we supply a previousState with a different type we get a warning
+      // expect(
+      //   () => reducer({ stack: [], counter: 0 }, { type: 'push', value: 'b' })
+      // ).toThrow(/The state has type Object but was expecting Map/)
     })
 
     it('ignores all props which are not a function', () => {
@@ -215,9 +221,6 @@ describe('Utils', () => {
         }
       })
 
-      reducer()
-      expect(spy.calls.length).toBe(0)
-
       reducer({ foo: { bar: 2 } })
       expect(spy.calls.length).toBe(0)
 
@@ -237,24 +240,26 @@ describe('Utils', () => {
         /Unexpected keys "bar", "qux".*createStore.*instead: "foo", "baz"/
       )
 
-      createStore(reducer, 1)
-      expect(spy.calls[2].arguments[0]).toMatch(
-        /createStore has unexpected type of "Number".*keys: "foo", "baz"/
+      expect(
+        () => createStore(reducer, 1)
+      ).toThrow(
+        /The state has type number but was expecting Object/
       )
 
       reducer({ bar: 2 })
-      expect(spy.calls[3].arguments[0]).toMatch(
+      expect(spy.calls[2].arguments[0]).toMatch(
         /Unexpected key "bar".*reducer.*instead: "foo", "baz"/
       )
 
       reducer({ bar: 2, qux: 4 })
-      expect(spy.calls[4].arguments[0]).toMatch(
+      expect(spy.calls[3].arguments[0]).toMatch(
         /Unexpected keys "bar", "qux".*reducer.*instead: "foo", "baz"/
       )
 
-      reducer(1)
-      expect(spy.calls[5].arguments[0]).toMatch(
-        /reducer has unexpected type of "Number".*keys: "foo", "baz"/
+      expect(
+        () => reducer(1)
+      ).toThrow(
+        /The state has type number but was expecting Object/
       )
 
       spy.restore()
