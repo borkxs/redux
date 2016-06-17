@@ -29,15 +29,35 @@ describe('Utils', () => {
         create: (obj) =>
           (obj instanceof Immutable.Map) ? obj : new Immutable.Map(obj),
         get: (state, key) => state.get(key),
-        set: (state, key, value) => state.set(key, value)
+        keys: (state) => state.keySeq().toArray()
       })
 
       const s1 = reducer(undefined, { type: 'increment' })
       expect(s1.get('counter')).toEqual(1)
       expect(s1.get('stack')).toEqual([])
       const s2 = reducer(s1, { type: 'push', value: 'a' })
-      expect(s2.get("counter")).toEqual(1)
-      expect(s2.get("stack")).toEqual([ 'a' ])
+      expect(s2.get('counter')).toEqual(1)
+      expect(s2.get('stack')).toEqual([ 'a' ])
+    })
+
+    it('uses "keys" method to warn if the state has unexpected keys', () => {
+      const create = (obj) =>
+        (obj instanceof Immutable.Map) ? obj : new Immutable.Map(obj)
+      const reducer = combineReducers({
+        counter: (state = 0, action) =>
+          action.type === 'increment' ? state + 1 : state
+      }, {
+        create,
+        get: (state, key) => state.get(key),
+        keys: (state) => state.keySeq().toArray()
+      })
+
+      const spy = expect.spyOn(console, 'error')
+      reducer(create({ flounder: 1 }), { type: 'increment' })
+      expect(spy.calls[0].arguments[0]).toMatch(
+        /Unexpected key "flounder".*/
+      )
+      spy.restore()
     })
 
     it('ignores all props which are not a function', () => {
@@ -237,24 +257,14 @@ describe('Utils', () => {
         /Unexpected keys "bar", "qux".*createStore.*instead: "foo", "baz"/
       )
 
-      createStore(reducer, 1)
-      expect(spy.calls[2].arguments[0]).toMatch(
-        /createStore has unexpected type of "Number".*keys: "foo", "baz"/
-      )
-
       reducer({ bar: 2 })
-      expect(spy.calls[3].arguments[0]).toMatch(
+      expect(spy.calls[2].arguments[0]).toMatch(
         /Unexpected key "bar".*reducer.*instead: "foo", "baz"/
       )
 
       reducer({ bar: 2, qux: 4 })
-      expect(spy.calls[4].arguments[0]).toMatch(
+      expect(spy.calls[3].arguments[0]).toMatch(
         /Unexpected keys "bar", "qux".*reducer.*instead: "foo", "baz"/
-      )
-
-      reducer(1)
-      expect(spy.calls[5].arguments[0]).toMatch(
-        /reducer has unexpected type of "Number".*keys: "foo", "baz"/
       )
 
       spy.restore()

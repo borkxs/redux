@@ -1,5 +1,5 @@
 import { ActionTypes } from './createStore'
-import isPlainObject from 'lodash/isPlainObject'
+import includes from 'lodash/includes'
 import warning from './utils/warning'
 
 function getUndefinedStateErrorMessage(key, action) {
@@ -12,8 +12,7 @@ function getUndefinedStateErrorMessage(key, action) {
   )
 }
 
-function getUnexpectedStateShapeWarningMessage(inputState, reducers, action) {
-  var reducerKeys = Object.keys(reducers)
+function getUnexpectedStateShapeWarningMessage(inputState, stateKeys, reducers, reducerKeys, action) {
   var argumentName = action && action.type === ActionTypes.INIT ?
     'preloadedState argument passed to createStore' :
     'previous state received by the reducer'
@@ -25,17 +24,7 @@ function getUnexpectedStateShapeWarningMessage(inputState, reducers, action) {
     )
   }
 
-  if (!isPlainObject(inputState)) {
-    return (
-      `The ${argumentName} has unexpected type of "` +
-      ({}).toString.call(inputState).match(/\s([a-z|A-Z]+)/)[1] +
-      `". Expected argument to be an object with the following ` +
-      `keys: "${reducerKeys.join('", "')}"`
-    )
-  }
-
-  var unexpectedKeys = Object.keys(inputState).filter(key => !reducers.hasOwnProperty(key))
-
+  var unexpectedKeys = stateKeys.filter(key => !reducers.hasOwnProperty(key))
   if (unexpectedKeys.length > 0) {
     return (
       `Unexpected ${unexpectedKeys.length > 1 ? 'keys' : 'key'} ` +
@@ -102,10 +91,7 @@ function assertReducerSanity(reducers) {
 export default function combineReducers(reducers, options = {
   create: (obj) => obj,
   get: (state, key) => state[key],
-  set: (state, key, stateForKey) => {
-    state[key] = stateForKey
-    return state
-  },
+  keys: (obj) => Object.keys(obj)
 }) {
   var reducerKeys = Object.keys(reducers)
   var finalReducers = {}
@@ -131,14 +117,16 @@ export default function combineReducers(reducers, options = {
     }
 
     if (process.env.NODE_ENV !== 'production') {
-      var warningMessage = getUnexpectedStateShapeWarningMessage(state, finalReducers, action)
+      var stateKeys = options.keys(state)
+
+      var warningMessage = getUnexpectedStateShapeWarningMessage(state, stateKeys, finalReducers, finalReducerKeys, action)
       if (warningMessage) {
         warning(warningMessage)
       }
     }
 
     var hasChanged = false
-    var nextState = options.create({})
+    var nextStateDescriptor = {}
     for (var i = 0; i < finalReducerKeys.length; i++) {
       var key = finalReducerKeys[i]
       var reducer = finalReducers[key]
@@ -148,9 +136,9 @@ export default function combineReducers(reducers, options = {
         var errorMessage = getUndefinedStateErrorMessage(key, action)
         throw new Error(errorMessage)
       }
-      nextState = options.set(nextState, key, nextStateForKey)
+      nextStateDescriptor[key] = nextStateForKey
       hasChanged = hasChanged || nextStateForKey !== previousStateForKey
     }
-    return hasChanged ? nextState : state
+    return hasChanged ? options.create(nextStateDescriptor) : state
   }
 }
