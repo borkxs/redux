@@ -1,5 +1,4 @@
 import { ActionTypes } from './createStore'
-import includes from 'lodash/includes'
 import warning from './utils/warning'
 
 function getUndefinedStateErrorMessage(key, action) {
